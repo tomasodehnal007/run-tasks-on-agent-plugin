@@ -3,12 +3,15 @@ package io.jenkins.plugins.adaptiveagent.action;
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import hudson.AbortException;
 import hudson.Extension;
+import hudson.model.Computer;
+import hudson.remoting.VirtualChannel;
 import hudson.slaves.OfflineCause;
 import io.jenkins.plugins.adaptiveagent.Phase;
 import io.jenkins.plugins.adaptiveagent.TaskContext;
 import io.jenkins.plugins.adaptiveagent.TaskDescriptor;
 import io.jenkins.plugins.adaptiveagent.util.ScriptRunner;
 import java.io.IOException;
+import java.time.Duration;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 /**
@@ -25,6 +28,11 @@ public class RebootAction extends Action {
 
     private static final String UNIX_COMMAND = "shutdown -r now";
     private static final String WINDOWS_COMMAND = "shutdown -r -f -t 0";
+
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
+
+    /** How long to wait for the agent to connect again after the reboot; shorter in tests. */
+    static Duration reconnectTimeout = Duration.ofMinutes(10);
 
     @CheckForNull
     private final String command;
@@ -64,23 +72,50 @@ public class RebootAction extends Action {
     /**
      * {@inheritDoc}
      *
+     * <p>After the command it waits until the agent connects again and then brings it back online, unless
+     * someone else has taken it offline in the meantime.
+     *
      * @throws AbortException if the reboot command exits with a non-zero code (the agent then stays offline
-     *     with a reason saying so), or if {@link #waitBeforeReboot} gives up
-     * @throws IOException if the command cannot be started
+     *     with a reason saying so), if {@link #waitBeforeReboot} gives up, or if the agent does not connect
+     *     again in time
+     * @throws IOException if {@link #waitBeforeReboot} fails
      * @throws InterruptedException if the thread is interrupted while waiting
      */
     @Override
     public void runAction(TaskContext context) throws IOException, InterruptedException {
-        SetOfflineAction.takeOffline(context);
+        OfflineCause cause = SetOfflineAction.takeOffline(context);
         waitBeforeReboot(context);
-        int exitCode =
-                ScriptRunner.run(context, effectiveCommand(context.launcher().isUnix()));
+        Computer computer = context.computer();
+        VirtualChannel channel = computer.getChannel();
+        int exitCode;
+        try {
+            exitCode = ScriptRunner.run(
+                    context, effectiveCommand(context.launcher().isUnix()));
+        } catch (AbortException e) {
+            throw e;
+        } catch (IOException e) {
+            // Usually the machine going down while the command runs; otherwise the agent does not come back below.
+            context.listener().getLogger().println("[adaptive-agent] The reboot command ended with: " + e);
+            exitCode = 0;
+        }
         if (exitCode != 0) {
-            context.computer()
-                    .setTemporaryOfflineCause(
-                            new OfflineCause.ByCLI("Reboot not done: the reboot command exited with code " + exitCode));
+            computer.setTemporaryOfflineCause(
+                    new OfflineCause.ByCLI("Reboot not done: the reboot command exited with code " + exitCode));
             throw new AbortException("The reboot command exited with code " + exitCode);
         }
+
+        long deadline = System.nanoTime() + reconnectTimeout.toNanos();
+        while (computer.getChannel() == null || computer.getChannel() == channel || computer.isConnecting()) {
+            if (System.nanoTime() - deadline > 0) {
+                throw new AbortException("The agent did not connect again within " + reconnectTimeout.toMinutes()
+                        + " minutes after the reboot");
+            }
+            Thread.sleep(POLL_INTERVAL.toMillis());
+        }
+        if (computer.getOfflineCause() == cause) {
+            computer.setTemporaryOfflineCause(null);
+        }
+        context.listener().getLogger().println("[adaptive-agent] The agent is back after the reboot");
     }
 
     /**

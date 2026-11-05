@@ -10,16 +10,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import hudson.model.FreeStyleBuild;
 import hudson.slaves.DumbSlave;
 import io.jenkins.plugins.adaptiveagent.condition.NoCondition;
+import java.time.Duration;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 
-/** The reboot command is always replaced by a harmless one. */
+/** The reboot command is always replaced by a harmless one, so the agent does not come back. */
 @WithJenkins
 class RebootActionTest {
 
+    @AfterEach
+    void restoreTimeout() {
+        RebootAction.reconnectTimeout = Duration.ofMinutes(10);
+    }
+
     @Test
     void takesTheAgentOfflineAndRunsTheRebootCommand(JenkinsRule jenkins) throws Exception {
+        RebootAction.reconnectTimeout = Duration.ofSeconds(1);
         DumbSlave agent = agentWith(jenkins, post(new NoCondition(), new RebootAction("echo REBOOT_COMMAND")));
 
         FreeStyleBuild build = jenkins.buildAndAssertSuccess(projectOn(jenkins, agent, "echo hello"));

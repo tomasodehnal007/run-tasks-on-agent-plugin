@@ -31,12 +31,15 @@ public class SetOfflineAction extends Action {
      * reboot actions.
      *
      * @param context the build and the agent to take offline
+     * @return the reason set on the agent
      */
-    static void takeOffline(TaskContext context) {
+    static OfflineCause takeOffline(TaskContext context) {
         Computer computer = context.computer();
         String message = "Taken offline by the Adaptive Jenkins Agent plugin. Triggered by build '"
                 + context.run().getFullDisplayName() + "'";
-        computer.setTemporaryOfflineCause(new OfflineCause.ByCLI(message));
+        OfflineCause cause = new OfflineCause.ByCLI(message);
+        computer.setTemporaryOfflineCause(cause);
+        return cause;
     }
 
     @Extension(ordinal = 60)
