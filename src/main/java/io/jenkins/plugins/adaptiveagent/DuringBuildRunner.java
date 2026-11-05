@@ -47,7 +47,7 @@ final class DuringBuildRunner {
             if (period <= 0) {
                 first.listener()
                         .getLogger()
-                        .println("[adaptive-agent] " + Phase.DURING_BUILD
+                        .println(Phase.DURING_BUILD
                                 + ": skipping a task without a valid interval, it is never checked");
                 continue;
             }

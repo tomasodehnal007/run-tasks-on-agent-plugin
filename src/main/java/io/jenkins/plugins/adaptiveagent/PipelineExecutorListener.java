@@ -136,7 +136,7 @@ public class PipelineExecutorListener implements ExecutorListener {
         if (node == null) {
             return null;
         }
-        TaskListener listener = listenerOf(run);
+        TaskListener listener = ActionRunner.prefixed(listenerOf(run), computer, executor);
         long startedAt = System.currentTimeMillis() - executor.getElapsedTime();
         return new TaskContext(run, computer, node.createLauncher(listener), listener, null, startedAt);
     }

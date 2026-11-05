@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.TestBuilder;
 
@@ -71,19 +72,24 @@ public final class TestSupport {
         return new ShellScriptAction("echo " + text);
     }
 
-    /** Number of lines of the log that are exactly {@code line} (the output of an echo, not the command line). */
+    /** Number of lines of the log that are exactly {@code line}, ignoring the prefix of task output. */
     public static long countLines(String log, String line) {
-        return log.lines().filter(line::equals).count();
+        return log.lines().map(TestSupport::withoutPrefix).filter(line::equals).count();
     }
 
-    /** Asserts that the lines (each on a line of its own) appear in the log in this order. */
+    /** Asserts that the lines appear in the log in this order, ignoring the prefix of task output. */
     public static void assertInOrder(String log, String... lines) {
+        String plain = log.lines().map(TestSupport::withoutPrefix).collect(Collectors.joining("\n", "\n", "\n"));
         int from = 0;
         for (String line : lines) {
-            int at = log.indexOf("\n" + line + "\n", from);
-            assertTrue(at >= 0, "expected '" + line + "' after position " + from + " in:\n" + log);
+            int at = plain.indexOf("\n" + line + "\n", from);
+            assertTrue(at >= 0, "expected '" + line + "' after position " + from + " in:\n" + plain);
             from = at + 1;
         }
+    }
+
+    private static String withoutPrefix(String line) {
+        return line.replaceFirst("^\\[adaptive-agent [^]]*] ", "");
     }
 
     /**

@@ -1,11 +1,19 @@
 package io.jenkins.plugins.adaptiveagent;
 
+import edu.umd.cs.findbugs.annotations.CheckForNull;
 import hudson.AbortException;
+import hudson.console.LineTransformationOutputStream;
+import hudson.model.Computer;
 import hudson.model.Describable;
+import hudson.model.Executor;
 import hudson.model.Node;
+import hudson.model.TaskListener;
+import hudson.util.StreamTaskListener;
 import io.jenkins.plugins.adaptiveagent.action.Action;
 import io.jenkins.plugins.adaptiveagent.condition.Condition;
 import io.jenkins.plugins.adaptiveagent.entry.BuildEntry;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -142,9 +150,27 @@ public final class ActionRunner {
         }
     }
 
+    /** Returns a listener that puts {@code [adaptive-agent agent#executor]} before every line it writes. */
+    public static TaskListener prefixed(TaskListener listener, Computer computer, @CheckForNull Executor executor) {
+        String label = executor == null ? computer.getName() : computer.getName() + "#" + executor.getNumber();
+        byte[] prefix = ("[adaptive-agent " + label + "] ").getBytes(StandardCharsets.UTF_8);
+        PrintStream out = listener.getLogger();
+        return new StreamTaskListener(
+                new LineTransformationOutputStream() {
+                    @Override
+                    protected void eol(byte[] bytes, int length) {
+                        synchronized (out) {
+                            out.write(prefix, 0, prefix.length);
+                            out.write(bytes, 0, length);
+                        }
+                    }
+                },
+                StandardCharsets.UTF_8);
+    }
+
     /** Writes into the console log of the build. */
     private void log(String message) {
-        context.listener().getLogger().println("[adaptive-agent] " + message);
+        context.listener().getLogger().println(message);
     }
 
     /** Writes the failure into the console log of the build; unexpected failures also into the Jenkins log. */

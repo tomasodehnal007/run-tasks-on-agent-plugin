@@ -61,6 +61,7 @@ public final class ScriptRunner {
                     : new String[] {"cmd", "/c", "call", file.getRemote()};
             return launcher.launch()
                     .cmds(command)
+                    .quiet(true)
                     .stdout(context.listener())
                     .pwd(workingDirectory)
                     .join();

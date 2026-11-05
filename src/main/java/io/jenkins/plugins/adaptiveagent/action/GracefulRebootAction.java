@@ -44,7 +44,7 @@ public class GracefulRebootAction extends RebootAction {
      */
     @Override
     protected void waitBeforeReboot(TaskContext context) throws IOException, InterruptedException {
-        context.listener().getLogger().println("[adaptive-agent] Waiting for the other builds on the agent to finish");
+        context.listener().getLogger().println("Waiting for the other builds on the agent to finish");
         long deadline = System.nanoTime() + MAX_WAIT.toNanos();
         while (otherBuildsRunning(context.computer())) {
             if (System.nanoTime() - deadline > 0) {

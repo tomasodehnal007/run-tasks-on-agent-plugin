@@ -95,7 +95,7 @@ public class RebootAction extends Action {
             throw e;
         } catch (IOException e) {
             // Usually the machine going down while the command runs; otherwise the agent does not come back below.
-            context.listener().getLogger().println("[adaptive-agent] The reboot command ended with: " + e);
+            context.listener().getLogger().println("The reboot command ended with: " + e);
             exitCode = 0;
         }
         if (exitCode != 0) {
@@ -115,7 +115,7 @@ public class RebootAction extends Action {
         if (computer.getOfflineCause() == cause) {
             computer.setTemporaryOfflineCause(null);
         }
-        context.listener().getLogger().println("[adaptive-agent] The agent is back after the reboot");
+        context.listener().getLogger().println("The agent is back after the reboot");
     }
 
     /**

@@ -7,14 +7,17 @@ import hudson.model.AbstractBuild;
 import hudson.model.BuildListener;
 import hudson.model.Computer;
 import hudson.model.Environment;
+import hudson.model.Executor;
 import hudson.model.Node;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import jenkins.model.Jenkins;
 
 /**
  * Trigger for Freestyle builds: Jenkins calls this listener for every build of every job, and from
@@ -25,8 +28,8 @@ import java.util.concurrent.ScheduledFuture;
  * waiting for a reboot), and other listeners may still need the agent or the workspace.
  *
  * <p>The only state is the timers of the during-build tasks, kept per build so that builds running
- * at the same time cannot touch each other's timers. Pipeline builds are not handled here, so they
- * are skipped.
+ * at the same time cannot touch each other's timers. The tasks of Pipeline builds are run by
+ * {@link PipelineExecutorListener}; here a Pipeline build only waits for its POST_BUILD tasks to finish.
  */
 @Extension(ordinal = -1000)
 public class RunListenerImpl extends RunListener<Run<?, ?>> {
@@ -52,12 +55,13 @@ public class RunListenerImpl extends RunListener<Run<?, ?>> {
         if (computer == null) {
             return new Environment() {};
         }
-        TaskContext context = new TaskContext(build, computer, launcher, listener, build.getWorkspace());
+        TaskListener tasksListener = ActionRunner.prefixed(listener, computer, build.getExecutor());
+        TaskContext context = new TaskContext(build, computer, launcher, tasksListener, build.getWorkspace());
         if (new ActionRunner(context).run(Phase.PRE_BUILD)) {
             throw new Run.RunnerAbortedException();
         }
         List<ScheduledFuture<?>> futures = DuringBuildRunner.start(
-                context, () -> new TaskContext(build, computer, launcher, listener, build.getWorkspace()));
+                context, () -> new TaskContext(build, computer, launcher, tasksListener, build.getWorkspace()));
         if (!futures.isEmpty()) {
             timers.put(build, futures);
         }
@@ -78,15 +82,31 @@ public class RunListenerImpl extends RunListener<Run<?, ?>> {
             futures.forEach(future -> future.cancel(true));
         }
         if (!(run instanceof AbstractBuild<?, ?> build)) {
-            return; // not a Freestyle build
+            waitForNodeBlocks(run);
+            return;
         }
         Node node = build.getBuiltOn();
         Computer computer = node == null ? null : node.toComputer();
         if (computer == null) {
             return;
         }
-        TaskContext context =
-                new TaskContext(build, computer, node.createLauncher(listener), listener, build.getWorkspace());
+        TaskListener tasksListener = ActionRunner.prefixed(listener, computer, build.getExecutor());
+        TaskContext context = new TaskContext(
+                build, computer, node.createLauncher(tasksListener), tasksListener, build.getWorkspace());
         new ActionRunner(context).run(Phase.POST_BUILD);
+    }
+
+    /** Waits until the POST_BUILD tasks of all node blocks of the Pipeline build have finished. */
+    private static void waitForNodeBlocks(Run<?, ?> run) {
+        try {
+            while (Arrays.stream(Jenkins.get().getComputers())
+                    .flatMap(computer -> computer.getExecutors().stream())
+                    .map(Executor::getCurrentExecutable)
+                    .anyMatch(executable -> executable != null && executable.getParentExecutable() == run)) {
+                Thread.sleep(500);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }
