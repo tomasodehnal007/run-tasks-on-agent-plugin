@@ -47,8 +47,8 @@ final class DuringBuildRunner {
             if (period <= 0) {
                 first.listener()
                         .getLogger()
-                        .println(Phase.DURING_BUILD
-                                + ": skipping a task without a valid interval, it is never checked");
+                        .println(
+                                Phase.DURING_BUILD + ": skipping a task without a valid interval, it is never checked");
                 continue;
             }
             Runnable check = checkOf(duringEntry, contexts);
