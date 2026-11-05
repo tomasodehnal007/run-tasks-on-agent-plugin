@@ -60,7 +60,8 @@ public class ResultCondition extends Condition {
     /**
      * {@inheritDoc}
      *
-     * <p>A build whose result is not set yet has had no failure so far and counts as successful.
+     * <p>A Pipeline build gets its result only when the whole Pipeline ends, so after a {@code node} block the
+     * result is not known and the condition does not hold.
      *
      * @return {@code true} if the build result is one of the results ticked in the form
      */
@@ -68,7 +69,8 @@ public class ResultCondition extends Condition {
     public boolean conditionPasses(TaskContext context) {
         Result result = context.run().getResult();
         if (result == null) {
-            result = Result.SUCCESS;
+            context.listener().getLogger().println("The result of the build is not known yet");
+            return false;
         }
         return (success && result == Result.SUCCESS)
                 || (failure && result == Result.FAILURE)
