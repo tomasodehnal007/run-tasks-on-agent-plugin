@@ -89,7 +89,7 @@ public final class TestSupport {
     }
 
     private static String withoutPrefix(String line) {
-        return line.replaceFirst("^\\[adaptive-agent [^]]*] ", "");
+        return line.replaceFirst("^\\[[^]]+#\\d+] ", "");
     }
 
     /**

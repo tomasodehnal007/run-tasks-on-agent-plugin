@@ -1,6 +1,7 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
-  <f:entry title="Run when the build result is">
+  <f:entry title="Run when the build result is"
+           description="In Pipeline builds the result is not known yet when a node block ends, so this condition is never met there.">
     <!-- A div around each checkbox puts every option on its own line. -->
     <div><f:checkbox title="Success" field="success"/></div>
     <div><f:checkbox title="Failure" field="failure"/></div>

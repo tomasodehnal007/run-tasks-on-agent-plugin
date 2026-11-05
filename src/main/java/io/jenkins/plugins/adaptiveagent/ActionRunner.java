@@ -150,10 +150,10 @@ public final class ActionRunner {
         }
     }
 
-    /** Returns a listener that puts {@code [adaptive-agent agent#executor]} before every line it writes. */
+    /** Returns a listener that puts {@code [agent#executor]} before every line it writes. */
     public static TaskListener prefixed(TaskListener listener, Computer computer, @CheckForNull Executor executor) {
         String label = executor == null ? computer.getName() : computer.getName() + "#" + executor.getNumber();
-        byte[] prefix = ("[adaptive-agent " + label + "] ").getBytes(StandardCharsets.UTF_8);
+        byte[] prefix = ("[" + label + "] ").getBytes(StandardCharsets.UTF_8);
         PrintStream out = listener.getLogger();
         return new StreamTaskListener(
                 new LineTransformationOutputStream() {
