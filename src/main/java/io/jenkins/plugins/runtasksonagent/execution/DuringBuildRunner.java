@@ -1,8 +1,10 @@
-package io.jenkins.plugins.runtasksonagent;
+package io.jenkins.plugins.runtasksonagent.execution;
 
-import io.jenkins.plugins.runtasksonagent.ActionRunner.EntryResult;
+import io.jenkins.plugins.runtasksonagent.Phase;
+import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.entry.BuildEntry;
 import io.jenkins.plugins.runtasksonagent.entry.DuringBuildEntry;
+import io.jenkins.plugins.runtasksonagent.execution.ActionRunner.EntryResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;

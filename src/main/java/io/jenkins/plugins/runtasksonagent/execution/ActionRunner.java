@@ -1,4 +1,4 @@
-package io.jenkins.plugins.runtasksonagent;
+package io.jenkins.plugins.runtasksonagent.execution;
 
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import hudson.AbortException;
@@ -9,6 +9,9 @@ import hudson.model.Executor;
 import hudson.model.Node;
 import hudson.model.TaskListener;
 import hudson.util.StreamTaskListener;
+import io.jenkins.plugins.runtasksonagent.NodePropertyImpl;
+import io.jenkins.plugins.runtasksonagent.Phase;
+import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.action.Action;
 import io.jenkins.plugins.runtasksonagent.condition.Condition;
 import io.jenkins.plugins.runtasksonagent.entry.BuildEntry;

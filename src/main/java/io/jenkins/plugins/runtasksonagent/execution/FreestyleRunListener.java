@@ -1,4 +1,4 @@
-package io.jenkins.plugins.runtasksonagent;
+package io.jenkins.plugins.runtasksonagent.execution;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
@@ -12,6 +12,8 @@ import hudson.model.Node;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
+import io.jenkins.plugins.runtasksonagent.Phase;
+import io.jenkins.plugins.runtasksonagent.TaskContext;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +34,7 @@ import jenkins.model.Jenkins;
  * {@link PipelineExecutorListener}; here a Pipeline build only waits for its POST_BUILD tasks to finish.
  */
 @Extension(ordinal = -1000)
-public class RunListenerImpl extends RunListener<Run<?, ?>> {
+public class FreestyleRunListener extends RunListener<Run<?, ?>> {
 
     /** Timers of the during-build tasks of the builds that are running now, by build. */
     private final Map<Run<?, ?>, List<ScheduledFuture<?>>> timers = new ConcurrentHashMap<>();

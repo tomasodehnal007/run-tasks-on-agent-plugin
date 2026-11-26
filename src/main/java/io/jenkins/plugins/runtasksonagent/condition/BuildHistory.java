@@ -1,4 +1,4 @@
-package io.jenkins.plugins.runtasksonagent.util;
+package io.jenkins.plugins.runtasksonagent.condition;
 
 import hudson.model.Run;
 import hudson.util.RunList;

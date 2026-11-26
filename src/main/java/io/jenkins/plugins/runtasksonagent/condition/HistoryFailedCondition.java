@@ -5,7 +5,6 @@ import hudson.model.Result;
 import hudson.model.Run;
 import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.TaskDescriptor;
-import io.jenkins.plugins.runtasksonagent.util.BuildHistory;
 import java.util.List;
 import org.kohsuke.stapler.DataBoundConstructor;
 

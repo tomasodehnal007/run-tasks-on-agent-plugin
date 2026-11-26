@@ -4,7 +4,6 @@ import hudson.Extension;
 import hudson.model.Run;
 import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.TaskDescriptor;
-import io.jenkins.plugins.runtasksonagent.util.BuildHistory;
 import io.jenkins.plugins.runtasksonagent.util.DurationComparison;
 import io.jenkins.plugins.runtasksonagent.util.IntervalUnit;
 import java.util.List;
