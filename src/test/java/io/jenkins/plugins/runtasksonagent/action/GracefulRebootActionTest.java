@@ -23,10 +23,10 @@ import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 
 /**
- * The agent has two executors: one runs a build that lasts until the test releases it, the other a build after
- * which the agent reboots. Only the build that creates the file {@code trigger} reboots, otherwise both builds
- * would wait for each other. The reboot command is replaced by a harmless one, so the agent does not come back
- * and the action gives up waiting for it after a short time.
+ * The agent has two executors, so two builds run on it at the same time; a build lasts until the test creates the
+ * file {@code release}. Only builds that create the file {@code trigger} in their workspace reboot the agent. The
+ * reboot command is replaced by a harmless one, so the agent does not come back and the action gives up waiting
+ * for it after a short time.
  */
 @WithJenkins
 class GracefulRebootActionTest {
@@ -41,18 +41,8 @@ class GracefulRebootActionTest {
 
     @Test
     void waitsUntilTheOtherBuildsOnTheAgentHaveFinished(JenkinsRule jenkins) throws Exception {
-        RebootAction.reconnectTimeout = Duration.ofSeconds(1);
-        DumbSlave agent = new DumbSlave(
-                "two-executors",
-                Files.createDirectories(tempDir.resolve("agent")).toString(),
-                jenkins.createComputerLauncher(null));
-        agent.setNumExecutors(2);
-        agent.setNodeProperties(List.of(new NodePropertyImpl(List.of(
-                post(new ScriptCondition("test -f trigger"), new GracefulRebootAction("echo REBOOT_COMMAND"))))));
-        jenkins.jenkins.addNode(agent);
-        jenkins.waitOnline(agent);
-        Path release = tempDir.resolve("release");
-        FreeStyleProject longJob = projectOn(jenkins, agent, "while [ ! -f '" + release + "' ]; do sleep 0.2; done");
+        DumbSlave agent = rebootingAgent(jenkins);
+        FreeStyleProject longJob = projectOn(jenkins, agent, waitForRelease());
         FreeStyleProject rebootingJob = projectOn(jenkins, agent, "touch trigger");
 
         QueueTaskFuture<FreeStyleBuild> longBuild = longJob.scheduleBuild2(0);
@@ -65,9 +55,46 @@ class GracefulRebootActionTest {
         assertTrue(rebooting.isInProgress());
         assertEquals(0, countLines(JenkinsRule.getLog(rebooting), "REBOOT_COMMAND"));
 
-        Files.createFile(release);
+        Files.createFile(tempDir.resolve("release"));
         jenkins.assertBuildStatusSuccess(longBuild);
         jenkins.assertBuildStatusSuccess(rebootingBuild);
         assertEquals(1, countLines(JenkinsRule.getLog(rebooting), "REBOOT_COMMAND"));
+    }
+
+    @Test
+    void onlyOneOfTwoBuildsThatBothWantAGracefulRebootRebootsTheAgent(JenkinsRule jenkins) throws Exception {
+        DumbSlave agent = rebootingAgent(jenkins);
+        FreeStyleProject first = projectOn(jenkins, agent, "touch trigger");
+        FreeStyleProject second = projectOn(jenkins, agent, "touch trigger; " + waitForRelease());
+
+        QueueTaskFuture<FreeStyleBuild> secondBuild = second.scheduleBuild2(0);
+        secondBuild.waitForStart();
+        QueueTaskFuture<FreeStyleBuild> firstBuild = first.scheduleBuild2(0);
+        jenkins.waitForMessage("Waiting for the other builds", firstBuild.waitForStart());
+
+        Files.createFile(tempDir.resolve("release"));
+        String firstLog = JenkinsRule.getLog(jenkins.assertBuildStatusSuccess(firstBuild));
+        String secondLog = JenkinsRule.getLog(jenkins.assertBuildStatusSuccess(secondBuild));
+        assertEquals(1, countLines(firstLog, "REBOOT_COMMAND"));
+        assertEquals(0, countLines(secondLog, "REBOOT_COMMAND"));
+        assertTrue(secondLog.contains("Another build is already rebooting the agent"));
+    }
+
+    private DumbSlave rebootingAgent(JenkinsRule jenkins) throws Exception {
+        RebootAction.reconnectTimeout = Duration.ofSeconds(1);
+        DumbSlave agent = new DumbSlave(
+                "two-executors",
+                Files.createDirectories(tempDir.resolve("agent")).toString(),
+                jenkins.createComputerLauncher(null));
+        agent.setNumExecutors(2);
+        agent.setNodeProperties(List.of(new NodePropertyImpl(List.of(
+                post(new ScriptCondition("test -f trigger"), new GracefulRebootAction("echo REBOOT_COMMAND"))))));
+        jenkins.jenkins.addNode(agent);
+        jenkins.waitOnline(agent);
+        return agent;
+    }
+
+    private String waitForRelease() {
+        return "while [ ! -f '" + tempDir.resolve("release") + "' ]; do sleep 0.2; done";
     }
 }

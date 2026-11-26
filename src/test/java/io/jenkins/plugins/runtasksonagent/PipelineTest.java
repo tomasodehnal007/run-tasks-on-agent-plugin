@@ -7,12 +7,15 @@ import static io.jenkins.plugins.runtasksonagent.TestSupport.echo;
 import static io.jenkins.plugins.runtasksonagent.TestSupport.post;
 import static io.jenkins.plugins.runtasksonagent.TestSupport.pre;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import hudson.model.Result;
 import hudson.slaves.DumbSlave;
 import io.jenkins.plugins.runtasksonagent.action.ShellScriptAction;
 import io.jenkins.plugins.runtasksonagent.condition.NoCondition;
 import io.jenkins.plugins.runtasksonagent.entry.PreBuildEntry;
+import io.jenkins.plugins.runtasksonagent.execution.FreestyleRunListenerAccess;
+import java.time.Duration;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
@@ -103,6 +106,24 @@ class PipelineTest {
             WorkflowRun build = run(jenkins, "node('agent-a') { echo 'SHOULD_NOT_RUN' }", Result.FAILURE);
 
             assertEquals(0, countLines(JenkinsRule.getLog(build), "SHOULD_NOT_RUN"));
+        }
+    }
+
+    @Test
+    void finishedPipelineStopsWaitingForSlowTasksAfterTheNodeBlockAfterTheTimeout(JenkinsRule jenkins)
+            throws Exception {
+        Duration original = FreestyleRunListenerAccess.nodeBlocksTimeout(Duration.ofSeconds(1));
+        try {
+            agentWith(jenkins, "agent-a", post(new NoCondition(), new ShellScriptAction("sleep 5")));
+
+            WorkflowRun build = run(jenkins, "node('agent-a') { echo 'BODY' }", Result.SUCCESS);
+
+            String log = JenkinsRule.getLog(build);
+            assertTrue(log.contains("Waiting for the tasks after the node blocks to finish"), log);
+            assertTrue(log.contains("Gave up waiting for the tasks after the node blocks"), log);
+            jenkins.waitUntilNoActivity();
+        } finally {
+            FreestyleRunListenerAccess.nodeBlocksTimeout(original);
         }
     }
 

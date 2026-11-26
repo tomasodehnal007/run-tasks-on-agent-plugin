@@ -12,6 +12,8 @@ import io.jenkins.plugins.runtasksonagent.TaskDescriptor;
 import io.jenkins.plugins.runtasksonagent.util.ScriptRunner;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import jenkins.util.SystemProperties;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 /**
@@ -31,8 +33,13 @@ public class RebootAction extends Action {
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
 
-    /** How long to wait for the agent to connect again after the reboot; shorter in tests. */
-    static Duration reconnectTimeout = Duration.ofMinutes(10);
+    /**
+     * How long to wait for the agent to connect again after the reboot; shorter in tests. 10 minutes by default,
+     * changed by the system property {@code io.jenkins.plugins.runtasksonagent.action.RebootAction.reconnectTimeout}
+     * (in minutes, or with a unit such as {@code 15m}).
+     */
+    static Duration reconnectTimeout = SystemProperties.getDuration(
+            RebootAction.class.getName() + ".reconnectTimeout", ChronoUnit.MINUTES, Duration.ofMinutes(10));
 
     @CheckForNull
     private final String command;
