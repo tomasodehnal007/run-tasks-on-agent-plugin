@@ -26,3 +26,5 @@ Refer to our [contribution guidelines](https://github.com/jenkinsci/.github/blob
 
 Licensed under MIT, see [LICENSE](LICENSE.md)
 
+Based on the ideas of the [Jenkins Agent Manager](https://github.com/skobyda/jenkins-agent-manager) plugin by Simon Kobyda.
+
