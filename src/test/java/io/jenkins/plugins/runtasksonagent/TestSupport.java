@@ -1,0 +1,117 @@
+package io.jenkins.plugins.runtasksonagent;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import hudson.FilePath;
+import hudson.Launcher;
+import hudson.model.AbstractBuild;
+import hudson.model.BuildListener;
+import hudson.model.FreeStyleBuild;
+import hudson.model.FreeStyleProject;
+import hudson.model.Label;
+import hudson.model.Result;
+import hudson.model.TaskListener;
+import hudson.slaves.DumbSlave;
+import hudson.tasks.Shell;
+import hudson.util.StreamTaskListener;
+import io.jenkins.plugins.runtasksonagent.action.Action;
+import io.jenkins.plugins.runtasksonagent.action.ShellScriptAction;
+import io.jenkins.plugins.runtasksonagent.condition.Condition;
+import io.jenkins.plugins.runtasksonagent.entry.BuildEntry;
+import io.jenkins.plugins.runtasksonagent.entry.PostBuildEntry;
+import io.jenkins.plugins.runtasksonagent.entry.PreBuildEntry;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.TestBuilder;
+
+/** Small helpers shared by the tests. */
+public final class TestSupport {
+
+    private TestSupport() {}
+
+    /** An online agent that has the given entries configured. */
+    public static DumbSlave agentWith(JenkinsRule jenkins, BuildEntry... entries) throws Exception {
+        return withEntries(jenkins.createOnlineSlave(), entries);
+    }
+
+    /** An online agent with the given label that has the given entries configured. */
+    public static DumbSlave agentWith(JenkinsRule jenkins, String label, BuildEntry... entries) throws Exception {
+        return withEntries(jenkins.createOnlineSlave(Label.get(label)), entries);
+    }
+
+    private static DumbSlave withEntries(DumbSlave agent, BuildEntry... entries) throws Exception {
+        agent.setNodeProperties(List.of(new NodePropertyImpl(List.of(entries))));
+        return agent;
+    }
+
+    /** A Freestyle job pinned to the agent whose only build step is the given shell script. */
+    public static FreeStyleProject projectOn(JenkinsRule jenkins, DumbSlave agent, String buildScript)
+            throws Exception {
+        FreeStyleProject project = jenkins.createFreeStyleProject();
+        project.setAssignedNode(agent);
+        project.getBuildersList().add(new Shell(buildScript));
+        return project;
+    }
+
+    /** An entry that runs before the build. */
+    public static PreBuildEntry pre(Condition condition, Action action) {
+        return new PreBuildEntry(condition, action);
+    }
+
+    /** An entry that runs after the build. */
+    public static PostBuildEntry post(Condition condition, Action action) {
+        return new PostBuildEntry(condition, action);
+    }
+
+    /** An action that prints the text, so the test can see in the log that it ran. */
+    public static ShellScriptAction echo(String text) {
+        return new ShellScriptAction("echo " + text);
+    }
+
+    /** Number of lines of the log that are exactly {@code line}, ignoring the prefix of task output. */
+    public static long countLines(String log, String line) {
+        return log.lines().map(TestSupport::withoutPrefix).filter(line::equals).count();
+    }
+
+    /** Asserts that the lines appear in the log in this order, ignoring the prefix of task output. */
+    public static void assertInOrder(String log, String... lines) {
+        String plain = log.lines().map(TestSupport::withoutPrefix).collect(Collectors.joining("\n", "\n", "\n"));
+        int from = 0;
+        for (String line : lines) {
+            int at = plain.indexOf("\n" + line + "\n", from);
+            assertTrue(at >= 0, "expected '" + line + "' after position " + from + " in:\n" + plain);
+            from = at + 1;
+        }
+    }
+
+    private static String withoutPrefix(String line) {
+        return line.replaceFirst("^\\[[^]]+#\\d+] ", "");
+    }
+
+    /**
+     * A context for running scripts on this machine without Jenkins: the output goes to {@code log}
+     * and the scripts run in {@code workspace}. There is no build and no agent.
+     */
+    public static TaskContext localContext(Path workspace, OutputStream log) {
+        TaskListener listener = new StreamTaskListener(log, StandardCharsets.UTF_8);
+        return new TaskContext(
+                null, null, new Launcher.LocalLauncher(listener), listener, new FilePath(workspace.toFile()));
+    }
+
+    /** Runs a new job on the built-in node; the build ends with the given result. */
+    public static FreeStyleBuild buildWithResult(JenkinsRule jenkins, Result result) throws Exception {
+        FreeStyleProject project = jenkins.createFreeStyleProject();
+        project.getBuildersList().add(new TestBuilder() {
+            @Override
+            public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
+                build.setResult(result);
+                return true;
+            }
+        });
+        return jenkins.assertBuildStatus(result, project.scheduleBuild2(0));
+    }
+}

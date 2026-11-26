@@ -1,0 +1,100 @@
+package io.jenkins.plugins.runtasksonagent.condition;
+
+import hudson.Extension;
+import hudson.model.Result;
+import io.jenkins.plugins.runtasksonagent.Phase;
+import io.jenkins.plugins.runtasksonagent.TaskContext;
+import io.jenkins.plugins.runtasksonagent.TaskDescriptor;
+import org.kohsuke.stapler.DataBoundConstructor;
+
+/**
+ * Condition on the result of the finished build. It only makes sense after the build, so it is
+ * offered only in {@link Phase#POST_BUILD}.
+ */
+public class ResultCondition extends Condition {
+
+    private final boolean success;
+    private final boolean failure;
+    private final boolean aborted;
+    private final boolean unstable;
+    private final boolean notBuilt;
+
+    /**
+     * The parameter names must match the field names in {@code config.jelly}.
+     *
+     * @param success passes when the build succeeded
+     * @param failure passes when the build failed
+     * @param aborted passes when the build was aborted
+     * @param unstable passes when the build is unstable
+     * @param notBuilt passes when the build was not built
+     */
+    @DataBoundConstructor
+    public ResultCondition(boolean success, boolean failure, boolean aborted, boolean unstable, boolean notBuilt) {
+        this.success = success;
+        this.failure = failure;
+        this.aborted = aborted;
+        this.unstable = unstable;
+        this.notBuilt = notBuilt;
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public boolean isFailure() {
+        return failure;
+    }
+
+    public boolean isAborted() {
+        return aborted;
+    }
+
+    public boolean isUnstable() {
+        return unstable;
+    }
+
+    public boolean isNotBuilt() {
+        return notBuilt;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A Pipeline build gets its result only when the whole Pipeline ends, so after a {@code node} block the
+     * result is not known and the condition does not hold.
+     *
+     * @return {@code true} if the build result is one of the results ticked in the form
+     */
+    @Override
+    public boolean conditionPasses(TaskContext context) {
+        Result result = context.run().getResult();
+        if (result == null) {
+            context.listener().getLogger().println("The result of the build is not known yet");
+            return false;
+        }
+        return (success && result == Result.SUCCESS)
+                || (failure && result == Result.FAILURE)
+                || (aborted && result == Result.ABORTED)
+                || (unstable && result == Result.UNSTABLE)
+                || (notBuilt && result == Result.NOT_BUILT);
+    }
+
+    @Extension(ordinal = 90)
+    public static final class DescriptorImpl extends TaskDescriptor<Condition> {
+
+        @Override
+        public String getDisplayName() {
+            return "Result of the build";
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @return {@code true} only for {@link Phase#POST_BUILD}, when the result is known
+         */
+        @Override
+        public boolean isApplicable(Phase phase) {
+            return phase == Phase.POST_BUILD;
+        }
+    }
+}
