@@ -1,5 +1,9 @@
 package io.jenkins.plugins.runtasksonagent.execution;
 
+import hudson.security.ACL;
+import hudson.util.ClassLoaderSanityThreadFactory;
+import hudson.util.DaemonThreadFactory;
+import hudson.util.NamingThreadFactory;
 import io.jenkins.plugins.runtasksonagent.Phase;
 import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.entry.BuildEntry;
@@ -7,13 +11,16 @@ import io.jenkins.plugins.runtasksonagent.entry.DuringBuildEntry;
 import io.jenkins.plugins.runtasksonagent.execution.ActionRunner.EntryResult;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import jenkins.util.Timer;
+import jenkins.security.ImpersonatingScheduledExecutorService;
+import jenkins.util.SystemProperties;
 
 /**
  * Schedules the {@link Phase#DURING_BUILD} entries: each one is checked periodically on a timer thread
@@ -21,10 +28,31 @@ import jenkins.util.Timer;
  *
  * <p>All state ("already performed") lives in the objects created by one call of {@link #start}, so it is
  * separate for every build. Nothing is kept in the configuration or in a shared field.
+ *
+ * <p>The checks run on a thread pool of their own, not on Jenkins' shared {@code jenkins.util.Timer}: a check can run
+ * a script for a long time, and many of them would otherwise use up the threads Jenkins needs for its own periodic
+ * work.
  */
 final class DuringBuildRunner {
 
     private static final Logger LOGGER = Logger.getLogger(DuringBuildRunner.class.getName());
+
+    /**
+     * How many checks can run at the same time, over all builds; 10 by default, changed by the system property
+     * {@code io.jenkins.plugins.runtasksonagent.execution.DuringBuildRunner.threads}. When all threads are busy, the
+     * next checks wait.
+     */
+    private static final int THREADS =
+            Math.max(1, SystemProperties.getInteger(DuringBuildRunner.class.getName() + ".threads", 10));
+
+    /** Runs the checks as the system user, like {@code jenkins.util.Timer} does. */
+    private static final ScheduledExecutorService EXECUTOR = new ImpersonatingScheduledExecutorService(
+            new ScheduledThreadPoolExecutor(
+                    THREADS,
+                    new NamingThreadFactory(
+                            new ClassLoaderSanityThreadFactory(new DaemonThreadFactory()),
+                            "RunTasksOnAgent.DuringBuild")),
+            ACL.SYSTEM2);
 
     private DuringBuildRunner() {}
 
@@ -54,7 +82,7 @@ final class DuringBuildRunner {
                 continue;
             }
             Runnable check = checkOf(duringEntry, contexts);
-            futures.add(Timer.get().scheduleWithFixedDelay(check, period, period, TimeUnit.MILLISECONDS));
+            futures.add(EXECUTOR.scheduleWithFixedDelay(check, period, period, TimeUnit.MILLISECONDS));
         }
         return futures;
     }
