@@ -51,7 +51,7 @@ Typical uses:
 | Action | Parameters | What it does | Before | During | After |
 |---|---|---|:---:|:---:|:---:|
 | Run custom shell script | shell script | runs the script on the agent; a non-zero exit code means the task failed | ✓ | ✓ | ✓ |
-| Run Groovy script on the agent | Groovy script | runs the script in the agent's JVM, its output goes to the build log | ✓ | ✓ | ✓ |
+| Run Groovy script on the agent | Groovy script | runs the script in the agent's JVM, its output goes to the build log; refused on the built-in node, whose JVM is the controller | ✓ | ✓ | ✓ |
 | Take agent offline | | the agent accepts no new builds until it is brought back online | ✓ | ✓ | ✓ |
 | Stop build | | aborts the build | ✓ | ✓ | |
 | Clean workspace | | empties the build's workspace (before the build: the one the job's previous build left) | ✓ | | ✓ |
@@ -148,6 +148,8 @@ first waits up to 30 minutes for the other builds on the agent.
 * Tasks can be configured by users with the *Agent/Configure* permission on the agent. Tasks on the built-in node
   can only be configured by administrators.
 * Scripts and other actions run on the agent as the operating system user running the agent, like build steps do.
+* *Run Groovy script on the agent* does not run on the built-in node: there it would run inside the Jenkins controller
+  with full control of Jenkins.
 
 ## Extending
 
