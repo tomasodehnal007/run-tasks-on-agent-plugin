@@ -60,6 +60,10 @@ Typical uses:
 
 Shell scripts (the action and the condition) run like the *Execute shell* build step (`sh -xe` on Unix, `cmd` on Windows).
 
+Every script (shell or Groovy) and every custom reboot command must be approved by an administrator in
+*Manage Jenkins » In-process Script Approval* before it runs; until then the task fails with a message saying so
+(see [Security](#security)).
+
 ![A task during the build: every 10 seconds, when less than 10 GiB is free, run a shell script](docs/images/during-build-task.png)
 
 The form only offers the conditions and actions that make sense in the chosen phase:
@@ -147,6 +151,11 @@ first waits up to 30 minutes for the other builds on the agent.
 
 * Tasks can be configured by users with the *Agent/Configure* permission on the agent. Tasks on the built-in node
   can only be configured by administrators.
+* Tasks run inside every build on the agent, whatever the job, and a Groovy script runs inside the agent's JVM, which
+  Jenkins otherwise allows only to administrators. So scripts, Groovy scripts and custom reboot commands go through the
+  [Script Security](https://plugins.jenkins.io/script-security/) plugin: a new or changed script waits in
+  *Manage Jenkins » In-process Script Approval* and does not run until an administrator approves it. This also applies
+  to configuration uploaded as `config.xml`.
 * Scripts and other actions run on the agent as the operating system user running the agent, like build steps do.
 
 ## Extending

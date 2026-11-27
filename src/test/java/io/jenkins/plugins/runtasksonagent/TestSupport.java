@@ -25,7 +25,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
+import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval;
 import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import org.jvnet.hudson.test.TestBuilder;
 
 /** Small helpers shared by the tests. */
@@ -33,7 +36,7 @@ public final class TestSupport {
 
     private TestSupport() {}
 
-    /** An online agent that has the given entries configured. */
+    /** An online agent that has the given entries configured; their scripts are approved. */
     public static DumbSlave agentWith(JenkinsRule jenkins, BuildEntry... entries) throws Exception {
         return withEntries(jenkins.createOnlineSlave(), entries);
     }
@@ -45,7 +48,25 @@ public final class TestSupport {
 
     private static DumbSlave withEntries(DumbSlave agent, BuildEntry... entries) throws Exception {
         agent.setNodeProperties(List.of(new NodePropertyImpl(List.of(entries))));
+        approveAll();
         return agent;
+    }
+
+    /** Approves every script waiting for approval, as an administrator would. */
+    public static void approveAll() {
+        ScriptApproval.get().preapproveAll();
+    }
+
+    /**
+     * Turns security on, with an administrator "admin". Without security, Script Security approves every script
+     * at once, so a test of an unapproved script needs it.
+     */
+    public static void enableSecurity(JenkinsRule jenkins) {
+        jenkins.jenkins.setSecurityRealm(jenkins.createDummySecurityRealm());
+        jenkins.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy()
+                .grant(Jenkins.ADMINISTER)
+                .everywhere()
+                .to("admin"));
     }
 
     /** A Freestyle job pinned to the agent whose only build step is the given shell script. */
