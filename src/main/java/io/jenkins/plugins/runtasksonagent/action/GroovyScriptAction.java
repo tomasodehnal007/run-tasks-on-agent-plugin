@@ -6,6 +6,7 @@ import hudson.remoting.VirtualChannel;
 import hudson.util.RemotingDiagnostics;
 import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.TaskDescriptor;
+import io.jenkins.plugins.runtasksonagent.util.ScriptRunner;
 import java.io.IOException;
 import org.kohsuke.stapler.DataBoundConstructor;
 
@@ -32,9 +33,10 @@ public class GroovyScriptAction extends Action {
     /**
      * {@inheritDoc}
      *
-     * <p>Sends the script to the agent, runs it there and writes its output into the build log.
+     * <p>Sends the script to the agent, runs it there and writes its output into the build log. A script still
+     * running after the time limit of {@link ScriptRunner#withTimeout} is interrupted on the agent.
      *
-     * @throws AbortException if there is no connection to the agent
+     * @throws AbortException if there is no connection to the agent, or the script ran out of time
      * @throws IOException if the script cannot be sent to the agent
      * @throws InterruptedException if the thread is interrupted while waiting for the script
      */
@@ -44,7 +46,8 @@ public class GroovyScriptAction extends Action {
         if (channel == null) {
             throw new AbortException("There is no channel to the agent");
         }
-        String output = RemotingDiagnostics.executeGroovy(scriptText, channel);
+        String output = ScriptRunner.withTimeout(
+                "The Groovy script", () -> RemotingDiagnostics.executeGroovy(scriptText, channel));
         context.listener().getLogger().print(output);
     }
 

@@ -149,6 +149,23 @@ first waits up to 30 minutes for the other builds on the agent.
   can only be configured by administrators.
 * Scripts and other actions run on the agent as the operating system user running the agent, like build steps do.
 
+## Time limits
+
+A script, condition script, Groovy script or reboot command that runs longer than the time limit is stopped and the
+task fails. Tasks during the build are checked on a thread pool of the plugin, so slow checks do not hold up the rest
+of Jenkins; when all its threads are busy, the next checks wait. The limits can be changed with system properties of
+the controller:
+
+| System property | Default | Meaning |
+|---|---|---|
+| `io.jenkins.plugins.runtasksonagent.util.ScriptRunner.timeout` | `60` (minutes) | the longest time a script may run |
+| `io.jenkins.plugins.runtasksonagent.execution.DuringBuildRunner.threads` | `10` | how many checks during the build can run at the same time |
+| `io.jenkins.plugins.runtasksonagent.action.GracefulRebootAction.maxWait` | `30` (minutes) | how long a graceful reboot waits for the other builds |
+| `io.jenkins.plugins.runtasksonagent.action.RebootAction.reconnectTimeout` | `10` (minutes) | how long a reboot waits for the agent to connect again |
+| `io.jenkins.plugins.runtasksonagent.execution.FreestyleRunListener.nodeBlocksTimeout` | `60` (minutes) | how long a finished Pipeline build waits for the tasks after its `node` blocks |
+
+Durations are in minutes, or with a unit such as `90m`.
+
 ## Extending
 
 Other plugins can add their own conditions and actions. Subclass `Condition` (or `Action`) and register a
