@@ -54,7 +54,7 @@ Typical uses:
 | Run Groovy script on the agent | Groovy script | runs the script in the agent's JVM, its output goes to the build log | ✓ | ✓ | ✓ |
 | Take agent offline | | the agent accepts no new builds until it is brought back online | ✓ | ✓ | ✓ |
 | Stop build | | aborts the build | ✓ | ✓ | |
-| Clean workspace | | empties the build's workspace (before the build: the one the job's previous build left) | ✓ | | ✓ |
+| Clean workspace | | empties the build's workspace (before the build: the one the job's previous build left, unless another build is using it) | ✓ | | ✓ |
 | Reboot the agent's machine | reboot command (optional) | takes the agent offline, reboots the machine and waits for the agent to connect again | | | ✓ |
 | Reboot the agent's machine when other builds have finished | reboot command (optional) | like the previous one, but first waits for the other builds on the agent to finish | | | ✓ |
 
