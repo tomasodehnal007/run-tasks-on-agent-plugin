@@ -9,11 +9,13 @@ import hudson.slaves.OfflineCause;
 import io.jenkins.plugins.runtasksonagent.Phase;
 import io.jenkins.plugins.runtasksonagent.TaskContext;
 import io.jenkins.plugins.runtasksonagent.TaskDescriptor;
+import io.jenkins.plugins.runtasksonagent.util.ScriptApprovals;
 import io.jenkins.plugins.runtasksonagent.util.ScriptRunner;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import jenkins.util.SystemProperties;
+import org.jenkinsci.plugins.scriptsecurity.scripts.languages.SystemCommandLanguage;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 /**
@@ -21,7 +23,8 @@ import org.kohsuke.stapler.DataBoundConstructor;
  * on at once, not just the agent process. Everything else running on that machine is restarted too.
  *
  * <p>Only offered after the build, so the build's own result is already final. The operating
- * system user running the agent must be allowed to run the reboot command.
+ * system user running the agent must be allowed to run the reboot command. A custom reboot command runs only once
+ * an administrator has approved it (see {@link ScriptApprovals}); the default commands need no approval.
  *
  * <p>The steps are always the same (take the agent offline, {@link #waitBeforeReboot}, run the command);
  * {@link GracefulRebootAction} only changes the waiting.
@@ -51,6 +54,17 @@ public class RebootAction extends Action {
     @DataBoundConstructor
     public RebootAction(@CheckForNull String command) {
         this.command = command == null || command.isBlank() ? null : command;
+        ScriptApprovals.configuring(this.command, SystemCommandLanguage.get(), true);
+    }
+
+    /**
+     * Registers the script loaded from the configuration (also on {@code POST config.xml}) for approval.
+     *
+     * @return this object
+     */
+    protected Object readResolve() {
+        ScriptApprovals.configuring(command, SystemCommandLanguage.get(), false);
+        return this;
     }
 
     /**
@@ -82,7 +96,8 @@ public class RebootAction extends Action {
      * <p>After the command it waits until the agent connects again and then brings it back online, unless
      * someone else has taken it offline in the meantime.
      *
-     * @throws AbortException if the reboot command exits with a non-zero code (the agent then stays offline
+     * @throws AbortException if the custom reboot command is not approved (the agent then stays online), if the
+     *     reboot command exits with a non-zero code (the agent then stays offline
      *     with a reason saying so), if {@link #waitBeforeReboot} gives up, or if the agent does not connect
      *     again in time
      * @throws IOException if {@link #waitBeforeReboot} fails
@@ -90,6 +105,9 @@ public class RebootAction extends Action {
      */
     @Override
     public void runAction(TaskContext context) throws IOException, InterruptedException {
+        if (command != null) {
+            ScriptApprovals.using(command, SystemCommandLanguage.get());
+        }
         OfflineCause cause = SetOfflineAction.takeOffline(context);
         waitBeforeReboot(context);
         Computer computer = context.computer();
